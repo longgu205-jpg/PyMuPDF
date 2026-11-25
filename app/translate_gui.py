@@ -151,6 +151,8 @@ class TranslatorApp(tk.Tk):
                 self.queue.put(("progress", info, stage))
 
             results = []
+            if out:
+                os.makedirs(out, exist_ok=True)
             for i, src_pdf in enumerate(files, 1):
                 target = (
                     os.path.join(
