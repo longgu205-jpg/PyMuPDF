@@ -14,6 +14,7 @@ from pdftrans.job import (
     parse_key,
     validate_input,
 )
+from pdftrans.glossary import load_glossary
 from pdftrans.pipeline import translate_pdf
 from pdftrans.translators import ENGINES, create_translator
 
@@ -31,6 +32,7 @@ class TranslatorApp(tk.Tk):
         self.abort_event = None
         self.var_input = tk.StringVar(value="")
         self.var_out = tk.StringVar(value="")
+        self.var_glossary = tk.StringVar(value="")
         self._build_widgets()
         self.after(100, self._poll_queue)
 
@@ -75,6 +77,11 @@ class TranslatorApp(tk.Tk):
         ttk.Button(row4, text="輸出資料夾（選填）", command=self.choose_out).pack(side="left")
         ttk.Label(row4, textvariable=self.var_out, foreground="#555").pack(side="left", padx=8)
 
+        row4b = ttk.Frame(frame)
+        row4b.pack(fill="x", **pad)
+        ttk.Button(row4b, text="術語表（選填）", command=self.choose_glossary).pack(side="left")
+        ttk.Label(row4b, textvariable=self.var_glossary, foreground="#555").pack(side="left", padx=8)
+
         row5 = ttk.Frame(frame)
         row5.pack(fill="x", **pad)
         self.btn_start = ttk.Button(row5, text="2. 開始翻譯", command=self.start)
@@ -115,6 +122,13 @@ class TranslatorApp(tk.Tk):
         if path:
             self.var_out.set(path)
 
+    def choose_glossary(self):
+        path = filedialog.askopenfilename(
+            title="選擇術語表（txt，一行一條：英文=中文）", filetypes=[("文字檔", "*.txt"), ("所有檔案", "*.*")]
+        )
+        if path:
+            self.var_glossary.set(path)
+
     def _log(self, msg):
         self.txt_log.configure(state="normal")
         self.txt_log.insert("end", msg + "\n")
@@ -128,7 +142,10 @@ class TranslatorApp(tk.Tk):
         dst = "zh-TW" if self.cmb_lang.get().startswith("zh-TW") else "zh-Hans"
         engine_kwargs = parse_key(engine, self.var_key.get().strip())
         out = self.var_out.get().strip() or (batch_out if len(files) > 1 else None)
-        return engine, dst, files, out, engine_kwargs
+        glossary_path = self.var_glossary.get().strip()
+        if glossary_path and not os.path.exists(glossary_path):
+            raise ValueError("術語表檔案不存在。")
+        return engine, dst, files, out, engine_kwargs, glossary_path
 
     def start(self):
         if self.worker and self.worker.is_alive():
@@ -139,7 +156,7 @@ class TranslatorApp(tk.Tk):
         except ValueError as e:
             messagebox.showerror("錯誤", str(e))
             return
-        engine, dst, files, out, engine_kwargs = job
+        engine, dst, files, out, engine_kwargs, glossary_path = job
         self.btn_start.configure(state="disabled")
         self.btn_abort.configure(state="normal")
         self.progress.configure(value=0)
@@ -154,9 +171,10 @@ class TranslatorApp(tk.Tk):
             self._log("正在中斷，等目前請求結束…")
         self.btn_abort.configure(state="disabled")
 
-    def _run(self, engine, dst, files, out, engine_kwargs):
+    def _run(self, engine, dst, files, out, engine_kwargs, glossary_path):
         try:
             translator = create_translator(engine, **engine_kwargs)
+            glossary = load_glossary(glossary_path) if glossary_path else None
 
             def cb(info, stage):
                 self.queue.put(("progress", info, stage))
@@ -183,6 +201,7 @@ class TranslatorApp(tk.Tk):
                         dst=dst,
                         progress_cb=cb,
                         abort=self.abort_event,
+                        glossary=glossary,
                     )
                 )
             self.queue.put(("done", results, None))

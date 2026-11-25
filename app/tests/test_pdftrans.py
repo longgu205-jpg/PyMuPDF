@@ -226,6 +226,100 @@ class TestBatchTranslate(unittest.TestCase):
             doc.close()
 
 
+class TestGlossary(unittest.TestCase):
+    def test_load_and_apply(self):
+        from pdftrans.glossary import apply_glossary, load_glossary
+
+        with tempfile.TemporaryDirectory() as tmp:
+            g = os.path.join(tmp, "g.txt")
+            with open(g, "w", encoding="utf-8") as f:
+                f.write("# 註解\nHMI=人機介面\n\n")
+            m = load_glossary(g)
+            self.assertEqual(m, {"HMI": "人機介面"})
+        self.assertEqual(apply_glossary("The HMI works.", m), "The 人機介面 works.")
+        self.assertEqual(apply_glossary("nothing", m), "nothing")
+        self.assertEqual(apply_glossary("x", {}), "x")
+
+    def test_apply_case_insensitive(self):
+        from pdftrans.glossary import apply_glossary
+
+        m = {"batch": "批次"}
+        self.assertEqual(apply_glossary("Batch data", m), "批次 data")
+
+
+class TestTables(unittest.TestCase):
+    def test_cell_grouping_splits_columns(self):
+        from pdftrans.layout import extract_blocks
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = os.path.join(tmp, "t.pdf")
+            doc = pymupdf.open()
+            page = doc.new_page(width=595, height=300)
+            page.insert_text((80, 100), "Cell one content", fontsize=10)
+            page.insert_text((270, 100), "Cell two content", fontsize=10)
+            doc.save(pdf)
+            doc.close()
+            d2 = pymupdf.open(pdf)
+            try:
+                cells = [pymupdf.Rect(72, 60, 250, 120), pymupdf.Rect(250, 60, 500, 120)]
+                blocks = extract_blocks(d2[0], cells=cells)
+                self.assertEqual(
+                    {b["text"] for b in blocks}, {"Cell one content", "Cell two content"}
+                )
+            finally:
+                d2.close()
+
+    def test_find_tables_smoke(self):
+        from pdftrans.layout import table_cells
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = os.path.join(tmp, "t.pdf")
+            doc = pymupdf.open()
+            page = doc.new_page(width=595, height=400)
+            xcols = [72, 200, 340, 500]
+            yrows = [80, 140, 200, 260]
+            for y in yrows:
+                page.draw_line(pymupdf.Point(72, y), pymupdf.Point(500, y))
+            for x in xcols:
+                page.draw_line(pymupdf.Point(x, 80), pymupdf.Point(x, 260))
+            for r in range(3):
+                for c in range(3):
+                    page.insert_text((xcols[c] + 8, yrows[r] + 25), f"Cell{r}{c}", fontsize=10)
+            doc.save(pdf)
+            doc.close()
+            d2 = pymupdf.open(pdf)
+            try:
+                self.assertGreater(len(table_cells(d2[0])), 0)
+                blocks = extract_blocks(d2[0])
+                texts = [b["text"] for b in blocks]
+                self.assertFalse(any("Cell00" in t and "Cell01" in t for t in texts))
+                self.assertFalse(any("Cell00" in t and "Cell10" in t for t in texts))
+            finally:
+                d2.close()
+
+
+class TestFailureResilience(unittest.TestCase):
+    def test_failed_block_keeps_source_text(self):
+        from pdftrans.translators import BaseTranslator
+
+        class Flaky(BaseTranslator):
+            def translate(self, text, src="en", dst="zh-TW"):
+                if "third" in text:
+                    raise RuntimeError("boom")
+                return "【中譯】" + text
+
+        with tempfile.TemporaryDirectory() as tmp:
+            src = make_sample_pdf(os.path.join(tmp, "in.pdf"))
+            out = os.path.join(tmp, "out.pdf")
+            out_path, info = translate_pdf(src, out, translator=Flaky())
+            self.assertEqual(info.failed_blocks, 1)
+            result = pymupdf.open(out_path)
+            text = re.sub(r"\s+", " ", result[0].get_text())
+            result.close()
+            self.assertIn("sales performance of the third quarter", text)
+            self.assertIn("【中譯】Quarterly", text)
+
+
 @unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS") == "1", "live network tests off")
 class TestLiveEngines(unittest.TestCase):
     def test_mymemory(self):

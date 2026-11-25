@@ -147,15 +147,18 @@ class DeepLTranslator(BaseTranslator):
             payload = {"text": chunk, "target_lang": _deepl_lang(dst)}
             if src:
                 payload["source_lang"] = src.upper()
-            data = _retry(
-                lambda p=payload: _http_json(
-                    f"https://{self.host}/v2/translate",
-                    data=p,
-                    headers={"Authorization": f"DeepL-Auth-Key {self.api_key}"},
+            try:
+                data = _retry(
+                    lambda p=payload: _http_json(
+                        f"https://{self.host}/v2/translate",
+                        data=p,
+                        headers={"Authorization": f"DeepL-Auth-Key {self.api_key}"},
+                    )
                 )
-            )
-            for j, tr in enumerate(data.get("translations", [])):
-                results[start + j] = tr.get("text")
+                for j, tr in enumerate(data.get("translations", [])):
+                    results[start + j] = tr.get("text")
+            except Exception as e:
+                print(f"[warn] DeepL 批次失敗，該批 {len(chunk)} 段保留英文：{e}")
             done += len(chunk)
             if progress:
                 progress(done, len(texts))

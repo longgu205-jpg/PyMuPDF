@@ -2,6 +2,7 @@ import os
 
 import pymupdf
 
+from .glossary import apply_glossary
 from .layout import extract_blocks, font_for_lang, int_to_rgb, needs_translation
 from .translators import TranslationCancelled
 
@@ -30,6 +31,7 @@ def translate_pdf(
     progress_cb=None,
     dump_text=None,
     abort=None,
+    glossary=None,
 ):
     pdf_path = str(pdf_path)
     if out_path is None:
@@ -71,7 +73,7 @@ def translate_pdf(
             texts, src=src, dst=dst, progress=batch_progress, abort=abort
         )
         for t, r in zip(texts, translations):
-            unique[t] = r
+            unique[t] = apply_glossary(r, glossary) if (r and glossary) else r
     info.done_blocks = info.total_blocks
     info.failed_blocks = sum(1 for v in unique.values() if v is None)
 

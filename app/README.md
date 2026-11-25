@@ -98,8 +98,25 @@ pip install pytest
 python -m pytest tests/test_pdftrans.py -v
 ```
 
-## 已知限制（階段 4 處理）
+## 表格處理（已支援）
 
-- 表格內的文字會被當成逐格段落翻譯，欄位寬度有限時可能擠在一起
+含框線的表格會用 PyMuPDF `find_tables` 自動偵測，**每個儲存格獨立翻譯**，不再把同一列的多格混成一段（這是技術文件譯文不通的主因）。
+
+## 術語表（固定專有名詞）
+
+1. 複製 `glossary_sample.txt` 成 `glossary.txt`，一行一條輸入 `英文=中文`：
+   ```
+   HMI=人機介面
+   batch=批次
+   ```
+2. GUI 按「術語表（選填）」選檔，或 CLI：
+   ```
+   python translate_cli.py 檔案.pdf --glossary glossary.txt
+   ```
+翻譯結果會自動替換成術語表譯法（大小寫不敏感），確保整份文件用語一致。
+
+## 已知限制
+
+- 無框線的假表格以版面偵測不到時，仍以段落處理；空白儲存格多、跨欄合併的複雜表格也可能不完美
 - 圖片內嵌文字（掃描 PDF）不在處理範圍，需要 OCR 才能翻
 - 免費引擎（mymemory/google）不保證專有名詞一致性，商用建議串 DeepL 或 LLM

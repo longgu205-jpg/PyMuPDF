@@ -23,6 +23,7 @@ def build_arg_parser():
     p.add_argument("--openai-base", default=None, help="OpenAI 相容 API base URL（或 OPENAI_BASE_URL）")
     p.add_argument("--openai-model", default=None, help="模型名稱（或 OPENAI_MODEL）")
     p.add_argument("--dump-text", default=None, help="把擷取到的原文區塊另存成 txt（除錯用）")
+    p.add_argument("--glossary", default=None, help="術語表檔案（一行一條：英文=中文），固定專有名詞譯法")
     return p
 
 
@@ -36,6 +37,8 @@ def main(argv=None):
         args.engine,
         **_engine_kwargs(args),
     )
+
+    from pdftrans.glossary import load_glossary
 
     last = {"pct": -1}
 
@@ -54,6 +57,7 @@ def main(argv=None):
             dst=args.dst,
             progress_cb=cb,
             dump_text=args.dump_text,
+            glossary=load_glossary(args.glossary) if args.glossary else None,
         )
     except (KeyboardInterrupt, TranslationCancelled):
         print("已中斷：未產生輸出檔。")

@@ -7,25 +7,66 @@ LETTER_RE = re.compile(r"[A-Za-z]")
 HYPHEN_JOIN_RE = re.compile(r"([A-Za-z])-\s+([a-z])")
 
 
-def extract_blocks(page):
+def table_cells(page):
+    cells = []
+    try:
+        finder = page.find_tables()
+        for table in getattr(finder, "tables", []):
+            for row in table.rows:
+                for cell in row.cells:
+                    if not cell:
+                        continue
+                    r = pymupdf.Rect(cell)
+                    if r.width >= 10 and r.height >= 6:
+                        cells.append(r)
+    except Exception:
+        return []
+    unique = []
+    for c in cells:
+        if not any(c in u or u in c for u in unique):
+            unique.append(c)
+    return unique
+
+
+def extract_blocks(page, cells=None):
     data = page.get_text("dict")
-    blocks = []
-    for block in data.get("blocks", []):
+    cells = cells if cells is not None else table_cells(page)
+    in_cell = [None] * len(cells)
+    for i, cell in enumerate(cells):
+        if cell.is_valid and cell.width > 1 and cell.height > 1:
+            in_cell[i] = cell
+
+    groups = {}
+
+    def group_key(span_bbox, block_index):
+        cx = (span_bbox.x0 + span_bbox.x1) / 2
+        cy = (span_bbox.y0 + span_bbox.y1) / 2
+        for i, cell in enumerate(in_cell):
+            if cell and cell.contains(pymupdf.Point(cx, cy)):
+                return ("cell", i)
+        return ("block", block_index)
+
+    for bno, block in enumerate(data.get("blocks", [])):
         if block.get("type") != 0:
             continue
-        line_texts = []
-        sizes = []
-        color = 0
         for line in block.get("lines", []):
-            spans = [s["text"] for s in line.get("spans", []) if s.get("text", "").strip()]
+            line_bbox = pymupdf.Rect(line["bbox"])
+            spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
             if not spans:
                 continue
-            line_texts.append(" ".join(spans))
-            for s in line.get("spans", []):
-                if s.get("text", "").strip():
-                    sizes.append(s.get("size", 10))
-                    color = s.get("color", color)
-        text = " ".join(line_texts)
+            key = group_key(line_bbox, bno)
+            g = groups.setdefault(key, {"texts": [], "sizes": [], "color": 0, "bbox": None})
+            g["texts"].append((line_bbox.y0, line_bbox.x0, " ".join(s["text"] for s in spans)))
+            for s in spans:
+                g["sizes"].append(s.get("size", 10))
+                g["color"] = s.get("color", g["color"])
+            span_rect = pymupdf.Rect(line["bbox"])
+            g["bbox"] = span_rect if g["bbox"] is None else g["bbox"] | span_rect
+
+    blocks = []
+    for key, g in sorted(groups.items(), key=lambda kv: (kv[0][0], min(t[0] for t in kv[1]["texts"]), kv[0][1])):
+        lines = sorted(g["texts"], key=lambda t: (round(t[0], 1), t[1]))
+        text = " ".join(t[2] for t in lines)
         text = HYPHEN_JOIN_RE.sub(r"\1\2", text)
         text = re.sub(r"\s+", " ", text).strip()
         if not text:
@@ -33,9 +74,9 @@ def extract_blocks(page):
         blocks.append(
             {
                 "text": text,
-                "bbox": pymupdf.Rect(block["bbox"]),
-                "size": max(sizes) if sizes else 10.0,
-                "color": color,
+                "bbox": g["bbox"],
+                "size": max(g["sizes"]) if g["sizes"] else 10.0,
+                "color": g["color"],
             }
         )
     return blocks
