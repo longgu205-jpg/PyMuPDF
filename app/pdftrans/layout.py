@@ -71,12 +71,14 @@ def extract_blocks(page, cells=None):
         text = re.sub(r"\s+", " ", text).strip()
         if not text:
             continue
+        cell_rect = in_cell[key[1]] if key[0] == "cell" else None
         blocks.append(
             {
                 "text": text,
                 "bbox": g["bbox"],
                 "size": max(g["sizes"]) if g["sizes"] else 10.0,
                 "color": g["color"],
+                "cell": cell_rect,
             }
         )
     return blocks

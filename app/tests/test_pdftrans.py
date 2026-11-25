@@ -301,6 +301,61 @@ class TestTables(unittest.TestCase):
 
 
 class TestFailureResilience(unittest.TestCase):
+    def test_cell_text_stays_in_cell(self):
+        from pdftrans.layout import table_cells
+        from pdftrans.pipeline import translate_pdf
+        from pdftrans.translators import MockTranslator
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = os.path.join(tmp, "t.pdf")
+            doc = pymupdf.open()
+            page = doc.new_page(width=595, height=400)
+            xcols = [72, 200, 340, 500]
+            yrows = [80, 140, 200, 260]
+            for y in yrows:
+                page.draw_line(pymupdf.Point(72, y), pymupdf.Point(500, y))
+            for x in xcols:
+                page.draw_line(pymupdf.Point(x, 80), pymupdf.Point(x, 260))
+            size = 8.0
+            while size >= 4.0:
+                rc = page.insert_textbox(
+                    pymupdf.Rect(84, 102, 194, 136),
+                    "Long sentence inside the first cell which must stay inside the border wrap wrap. " * 2,
+                    fontsize=size,
+                )
+                if rc >= 0:
+                    break
+                size -= 0.5
+            for r in range(3):
+                for c in range(1, 3):
+                    page.insert_text((xcols[c] + 8, yrows[r] + 25), f"Cell{r}{c}", fontsize=9)
+            doc.save(pdf)
+            doc.close()
+
+            d0 = pymupdf.open(pdf)
+            cells = table_cells(d0[0])
+            d0.close()
+            self.assertGreater(len(cells), 0)
+            first_cell = min(cells, key=lambda c: (c.y0, c.x0))
+
+            out, _info = translate_pdf(pdf, os.path.join(tmp, "o.pdf"), translator=MockTranslator())
+            d2 = pymupdf.open(out)
+            try:
+                checked = 0
+                for b in d2[0].get_text("dict")["blocks"]:
+                    for l in b.get("lines", []):
+                        for s in l.get("spans", []):
+                            sb = pymupdf.Rect(s["bbox"])
+                            if sb.intersects(first_cell):
+                                self.assertGreaterEqual(sb.x0, first_cell.x0 - 2, s["text"])
+                                self.assertLessEqual(sb.x1, first_cell.x1 + 2, s["text"])
+                                self.assertGreaterEqual(sb.y0, first_cell.y0 - 2, s["text"])
+                                self.assertLessEqual(sb.y1, first_cell.y1 + 2, s["text"])
+                                checked += 1
+                self.assertGreater(checked, 0)
+            finally:
+                d2.close()
+
     def test_failed_block_keeps_source_text(self):
         from pdftrans.translators import BaseTranslator
 

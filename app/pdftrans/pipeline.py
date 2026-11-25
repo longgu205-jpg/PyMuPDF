@@ -121,18 +121,22 @@ import html as _html
 def _insert_translation(page, block, dst):
     font = font_for_lang(dst)
     rect = pymupdf.Rect(block["bbox"])
-    margin = 2.0
-    avail = pymupdf.Rect(
-        max(rect.x0 - margin, 0),
-        max(rect.y0 - margin, 0),
-        min(rect.x1 + rect.width * 0.25, page.rect.x1 - margin),
-        min(rect.y1 + rect.height * 0.75, page.rect.y1 - margin),
-    )
+    cell = block.get("cell")
+    if cell and cell.is_valid:
+        avail = pymupdf.Rect(cell) + (1.5, 3.0, -1.5, -1.0)
+    else:
+        margin = 2.0
+        avail = pymupdf.Rect(
+            max(rect.x0 - margin, 0),
+            max(rect.y0 - margin, 0),
+            min(rect.x1 + rect.width * 0.25, page.rect.x1 - margin),
+            min(rect.y1 + rect.height * 0.75, page.rect.y1 - margin),
+        )
     color = int_to_rgb(block.get("color", 0))
     rgb_css = ", ".join(f"{c:.0f}" for c in (color[0] * 255, color[1] * 255, color[2] * 255))
     size = min(max(block["size"], 6.0), 24.0)
     body = _html.escape(block["zh"]).replace("\n", "<br>")
-    css = f"p{{margin:0;color:rgb({rgb_css});font-family:{font};}}"
+    css = f"p{{margin:0;color:rgb({rgb_css});font-family:{font};line-height:1.35;}}"
     try:
         _spare, scale = page.insert_htmlbox(avail, f"<p>{body}</p>", css=css, scale_low=0.3)
         if scale > 0.3 or _spare >= 0:
