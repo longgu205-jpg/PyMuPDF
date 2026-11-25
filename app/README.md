@@ -8,7 +8,7 @@
 |------|------|------|
 | 1 | 核心翻譯管線：區塊擷取 → 呼叫翻譯引擎 → 譯文寫回原位置 | ✅ 完成 |
 | 2 | GUI（tkinter）＋資料夾批次＋進度條 | ✅ 完成 |
-| 3 | Windows exe 打包（一鍵 build.bat，onedir 不包成單一 exe，避免檔案過大、啟動較快） | 待做 |
+| 3 | Windows exe 打包（一鍵 build.bat，onedir 不包成單一 exe，避免檔案過大、啟動較快） | ✅ 已提供 build.bat，待 Windows 實測 |
 | 4 | 術語表固定翻譯、雙語對照輸出、排版微調 | 選配 |
 
 ## 目錄結構
@@ -73,6 +73,24 @@ python translate_cli.py 樣本.pdf --engine openai --openai-key 你的KEY \
 # 除錯：只看抓到哪些文字區塊，不翻譯、不呼叫網路
 python translate_cli.py 樣本.pdf --dump-text blocks.txt --engine mock
 ```
+
+## 打包 Windows exe（給同事用，階段 3）
+
+在 `app` 資料夾內執行 `build.bat`（檔案總管雙擊，或 PyCharm 終端機執行 `build.bat`），它會自動：
+
+1. 建立乾淨的打包用虛擬環境 `build_venv/`
+2. 安裝 pymupdf + PyInstaller
+3. 先跑完整測試，全綠才繼續
+4. 打包成 onedir：`app\dist\PDFTranslator\PDFTranslator.exe`
+
+把**整個 `dist\PDFTranslator` 資料夾**壓成 zip 給同事即可——同事解壓縮後直接執行 `PDFTranslator.exe`，不需要安裝 Python。同事第一次用時輸入自己的 DeepL API key 並勾「記住 API Key」（key 只存在同事自己的電腦 `%APPDATA%\pdf_translator_config.json`）。
+
+注意：
+
+- build.bat 的訊息是英文（避免 Windows 命令列編碼問題）
+- 首次打包要下載 PyInstaller，約幾分鐘；產出資料夾約 150~250 MB
+- 掃毒軟體偶爾會誤判 PyInstaller 打包的 exe，加入信任即可
+- 想換 exe 圖示：在 build.bat 的 PyInstaller 命令加上 `--icon 圖示.ico`（選配）
 
 ## 翻譯速度
 
