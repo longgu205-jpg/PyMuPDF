@@ -32,7 +32,10 @@ class TestLayout(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             pdf = make_sample_pdf(os.path.join(tmp, "in.pdf"))
             doc = pymupdf.open(pdf)
-            blocks = extract_blocks(doc[0])
+            try:
+                blocks = extract_blocks(doc[0])
+            finally:
+                doc.close()
             texts = [b["text"] for b in blocks]
             self.assertTrue(any("Quarterly Sales Report" in t for t in texts))
             self.assertTrue(any("sales performance" in t for t in texts))
