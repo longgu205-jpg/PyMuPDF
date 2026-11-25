@@ -6,8 +6,8 @@
 
 | 階段 | 內容 | 狀態 |
 |------|------|------|
-| 1 | 核心翻譯管線：區塊擷取 → 呼叫翻譯引擎 → 譯文寫回原位置 | ✅ 本次完成 |
-| 2 | GUI（tkinter）＋資料夾批次＋進度列 | 下一階段 |
+| 1 | 核心翻譯管線：區塊擷取 → 呼叫翻譯引擎 → 譯文寫回原位置 | ✅ 完成 |
+| 2 | GUI（tkinter）＋資料夾批次＋進度條 | ✅ 完成 |
 | 3 | Windows exe 打包（一鍵 build.bat，onedir 不包成單一 exe，避免檔案過大、啟動較快） | 待做 |
 | 4 | 術語表固定翻譯、雙語對照輸出、排版微調 | 選配 |
 
@@ -29,6 +29,21 @@ app/
 1. 開啟本專案後，建立 venv：`Settings → Project → Python Interpreter → Add Interpreter → Virtualenv Environment`
 2. 終端機執行 `pip install -r app/requirements.txt`
 3. 把 `app/translate_cli.py` 設為 Run Configuration，Parameters 填輸入 PDF 路徑即可執行
+
+## GUI 用法（階段 2）
+
+```bash
+cd app
+python translate_gui.py
+```
+
+或直接在 PyCharm 對 `translate_gui.py` 按 Run。操作方式：
+
+1. 選一個 PDF 檔案，**或**選一個資料夾（會批次處理裡面所有 PDF）
+2. 選翻譯引擎（預設 MyMemory 免金鑰）；DeepL / LLM 需在 API Key 欄輸入金鑰
+3. 按視窗按鈕「開始翻譯」，進度條會即時顯示，完成後可一鍵開啟輸出資料夾
+
+批次模式的輸出預設在 `<輸入資料夾>_translated/`，單檔模式預設與輸入檔同資料夾（`原名_translated.pdf`）。
 
 ## 命令列用法
 

@@ -92,6 +92,58 @@ class TestPipeline(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(tmp, "o.pdf")))
 
 
+class TestGuiHelpers(unittest.TestCase):
+    def test_label_mapping(self):
+        from pdftrans.job import ENGINE_LABELS, engine_to_label, label_to_engine
+
+        for name in ENGINE_LABELS:
+            self.assertEqual(label_to_engine(engine_to_label(name)), name)
+
+    def test_index_pdf_files_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            make_sample_pdf(os.path.join(tmp, "a.pdf"))
+            make_sample_pdf(os.path.join(tmp, "b.pdf"))
+            with open(os.path.join(tmp, "note.txt"), "w", encoding="utf-8") as f:
+                f.write("x")
+            files, out = index_pdf_files_helper(tmp)
+            self.assertEqual(len(files), 2)
+            self.assertTrue(out.endswith("_translated"))
+
+    def test_index_pdf_files_single(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = make_sample_pdf(os.path.join(tmp, "a.pdf"))
+            files, out = index_pdf_files_helper(pdf)
+            self.assertEqual(files, [pdf])
+            self.assertIsNone(out)
+
+    def test_parse_key(self):
+        from pdftrans.job import parse_key
+
+        self.assertEqual(parse_key("mymemory", ""), {})
+        self.assertEqual(parse_key("deepl", "ABC"), {"deepl_key": "ABC"})
+        self.assertEqual(
+            parse_key("openai", "https://x/v1|KEY|m"),
+            {"openai_key": "KEY", "openai_base": "https://x/v1", "openai_model": "m"},
+        )
+        self.assertEqual(parse_key("openai", "KEY"), {"openai_key": "KEY", "openai_base": None, "openai_model": None})
+        with self.assertRaises(ValueError):
+            parse_key("deepl", "")
+
+    def test_validate_input(self):
+        from pdftrans.job import validate_input
+
+        with self.assertRaises(ValueError):
+            validate_input("")
+        with self.assertRaises(ValueError):
+            validate_input(os.path.join("", "not-exist-dir-xyz"))
+
+
+def index_pdf_files_helper(path):
+    from pdftrans.job import index_pdf_files
+
+    return index_pdf_files(path)
+
+
 @unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS") == "1", "live network tests off")
 class TestLiveEngines(unittest.TestCase):
     def test_mymemory(self):
