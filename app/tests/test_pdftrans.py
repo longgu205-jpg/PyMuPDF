@@ -73,12 +73,14 @@ class TestPipeline(unittest.TestCase):
                 for b in result[0].get_text("dict")["blocks"] if b.get("type") == 0
                 for l in b.get("lines", []) for s in l.get("spans", [])
             ]
-            helvetica = [t for f, t in spans if "Fangti" not in f and f != "ZapfDingbats"]
-            non_date = [t for t in helvetica if "2024-10-01" not in t]
-            self.assertEqual(non_date, [])
-            cjk_text = re.sub(r"\s+", " ", " ".join(t for f, t in spans if "Fangti" in f))
-            self.assertIn("【中譯】Quarterly Sales Report", cjk_text)
-            self.assertGreater(len(spans), 2)
+            leftover_orig = [
+                t for f, t in spans
+                if f.startswith("Helvetica") and "2024-10-01" not in t
+            ]
+            self.assertEqual(leftover_orig, [])
+            new_text = re.sub(r"\s+", "", " ".join(t for f, t in spans if not f.startswith("Helvetica")))
+            self.assertIn("【中譯】QuarterlySalesReport", new_text)
+            self.assertGreater(len(spans), 3)
             result.close()
 
     def test_cli_mock(self):

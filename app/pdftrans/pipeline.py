@@ -115,6 +115,9 @@ def _dump_stages_text(pending, dump_path):
                 f.write(f"[{b['bbox']}] {b['text']}\n")
 
 
+import html as _html
+
+
 def _insert_translation(page, block, dst):
     font = font_for_lang(dst)
     rect = pymupdf.Rect(block["bbox"])
@@ -126,9 +129,20 @@ def _insert_translation(page, block, dst):
         min(rect.y1 + rect.height * 0.75, page.rect.y1 - margin),
     )
     color = int_to_rgb(block.get("color", 0))
+    rgb_css = ", ".join(f"{c:.0f}" for c in (color[0] * 255, color[1] * 255, color[2] * 255))
     size = min(max(block["size"], 6.0), 24.0)
-    smallest = 4.0
-    while size >= smallest:
+    body = _html.escape(block["zh"]).replace("\n", "<br>")
+    css = f"p{{margin:0;color:rgb({rgb_css});font-family:{font};}}"
+    try:
+        _spare, scale = page.insert_htmlbox(avail, f"<p>{body}</p>", css=css, scale_low=0.3)
+        if scale > 0.3 or _spare >= 0:
+            return True
+        _spare2, _scale2 = page.insert_htmlbox(avail, f"<p>{body}</p>", css=css, scale_low=0.05)
+        if _spare2 >= 0 or _scale2 > 0.05:
+            return True
+    except Exception:
+        pass
+    while size >= 4.0:
         rc = page.insert_textbox(
             avail,
             block["zh"],
