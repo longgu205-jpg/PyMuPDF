@@ -70,4 +70,22 @@ def font_for_lang(dst):
 
 
 def int_to_rgb(color):
-    return pymupdf.sRGB_to_rgb(color)
+    if isinstance(color, (list, tuple)):
+        try:
+            vals = [float(v) for v in color]
+        except (TypeError, ValueError):
+            return (0.0, 0.0, 0.0)
+        if len(vals) not in (1, 3, 4):
+            return (0.0, 0.0, 0.0)
+        if any(v < 0 or v > 1 for v in vals):
+            if all(0 <= v <= 255 for v in vals):
+                vals = [v / 255.0 for v in vals]
+            else:
+                return (0.0, 0.0, 0.0)
+        return tuple(vals)
+    if isinstance(color, bool) or not isinstance(color, (int, float)):
+        return (0.0, 0.0, 0.0)
+    c = int(color)
+    if 0 <= c <= 0xFFFFFF:
+        return ((c >> 16) & 255) / 255.0, ((c >> 8) & 255) / 255.0, (c & 255) / 255.0
+    return (0.0, 0.0, 0.0)

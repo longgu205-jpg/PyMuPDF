@@ -137,6 +137,17 @@ class TestGuiHelpers(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_input(os.path.join("", "not-exist-dir-xyz"))
 
+    def test_color_normalization(self):
+        from pdftrans.layout import int_to_rgb
+
+        self.assertAlmostEqual(int_to_rgb(0xFF0000), (1.0, 0.0, 0.0))
+        self.assertAlmostEqual(int_to_rgb(0), (0.0, 0.0, 0.0))
+        self.assertEqual(int_to_rgb((0.5, 0.5, 0.5)), (0.5, 0.5, 0.5))
+        self.assertEqual(int_to_rgb((128, 128, 128)), (128 / 255, 128 / 255, 128 / 255))
+        for bad in [None, "red", -5, 0xFFFFFFFF, (1, 2), (0.5,), object(), True]:
+            result = int_to_rgb(bad)
+            self.assertEqual(result, (0.0, 0.0, 0.0), str(bad))
+
 
 def index_pdf_files_helper(path):
     from pdftrans.job import index_pdf_files

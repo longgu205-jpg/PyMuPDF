@@ -86,7 +86,11 @@ def translate_pdf(
         for b in tasks:
             if not b.get("zh"):
                 continue
-            _insert_translation(page, b, dst)
+            try:
+                _insert_translation(page, b, dst)
+            except Exception as e:
+                info.failed_blocks += 1
+                print(f"[warn] page {pno + 1} block insert skipped ({e})")
         if progress_cb:
             progress_cb(info, f"writing page {pno + 1}/{doc.page_count}")
 
