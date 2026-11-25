@@ -161,8 +161,8 @@ class DeepLTranslator(BaseTranslator):
                 progress(done, len(texts))
         return results
 
-    def __init__(self, api_key=None, host=None):
-        self.api_key = api_key or os.environ.get("DEEPL_API_KEY", "")
+    def __init__(self, deepl_key=None, api_key=None, host=None):
+        self.api_key = deepl_key or api_key or os.environ.get("DEEPL_API_KEY", "")
         self.host = host or os.environ.get("DEEPL_API_HOST", "")
         if not self.api_key:
             raise TranslationError("DeepL 需要 API key：傳入 --deepl-key 或設定環境變數 DEEPL_API_KEY。")
@@ -190,8 +190,8 @@ class OpenAITranslator(BaseTranslator):
     name = "openai"
     CONCURRENCY = 4
 
-    def __init__(self, api_key=None, base_url=None, model=None, prompt=None):
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+    def __init__(self, openai_key=None, api_key=None, base_url=None, model=None, prompt=None):
+        self.api_key = openai_key or api_key or os.environ.get("OPENAI_API_KEY", "")
         self.base_url = (base_url or os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
         self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
         self.prompt = prompt or os.environ.get("OPENAI_PROMPT", "")

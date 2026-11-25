@@ -129,6 +129,19 @@ class TestGuiHelpers(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_key("deepl", "")
 
+    def test_create_translator_key_aliases(self):
+        from pdftrans.translators import DeepLTranslator, OpenAITranslator, create_translator, MockTranslator
+
+        self.assertIsInstance(create_translator("mock"), MockTranslator)
+        d = create_translator("deepl", deepl_key="abc:fx")
+        self.assertEqual(d.host, "api-free.deepl.com")
+        d2 = create_translator("deepl", api_key="abc")
+        self.assertEqual(d2.host, "api.deepl.com")
+        o = create_translator("openai", openai_key="K", openai_base="https://x/v1", openai_model="m")
+        self.assertIsInstance(o, OpenAITranslator)
+        self.assertEqual(o.model, "m")
+        self.assertEqual(o.base_url, "https://x/v1")
+
     def test_validate_input(self):
         from pdftrans.job import validate_input
 
