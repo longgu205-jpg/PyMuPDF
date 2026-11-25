@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pdftrans.pipeline import translate_path
-from pdftrans.translators import create_translator
+from pdftrans.translators import TranslationCancelled, create_translator
 
 
 def build_arg_parser():
@@ -45,15 +45,19 @@ def main(argv=None):
             print(f"[{stage}] 進度 {pct}%（{info.done_blocks}/{info.total_blocks} 區塊）")
             last["pct"] = pct
 
-    results = translate_path(
-        args.input,
-        args.output,
-        translator=translator,
-        src=args.src,
-        dst=args.dst,
-        progress_cb=cb,
-        dump_text=args.dump_text,
-    )
+    try:
+        results = translate_path(
+            args.input,
+            args.output,
+            translator=translator,
+            src=args.src,
+            dst=args.dst,
+            progress_cb=cb,
+            dump_text=args.dump_text,
+        )
+    except (KeyboardInterrupt, TranslationCancelled):
+        print("已中斷：未產生輸出檔。")
+        return 130
     n_fail = sum(r[1].failed_blocks for r in results)
     for out_path, info in results:
         print(f"完成：{out_path}（{info.page_count} 頁 / {info.total_blocks} 區塊 / 失敗 {info.failed_blocks}）")

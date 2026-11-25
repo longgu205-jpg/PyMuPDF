@@ -73,6 +73,13 @@ python translate_cli.py 樣本.pdf --engine openai --openai-key 你的KEY \
 python translate_cli.py 樣本.pdf --dump-text blocks.txt --engine mock
 ```
 
+## 翻譯速度
+
+- 管線採「先收集全部區塊 → 平行批次翻譯 → 統一寫回」：Google/MyMemory/LLM 以多執行緒（6~8）同時請求，DeepL 一次請求打包 50 個區塊，速度遠快於逐區塊串行
+- 相同文字區塊自動去重，不重複付費/耗額度
+- GUI 有「中斷」按鈕，CLI 按 Ctrl+C；中斷後不產生輸出檔
+- 想再快：申請 DeepL 免費 key（每月 50 萬字）是目前品質/速度最佳解
+
 ## 翻譯引擎比較
 
 | 引擎 | 金鑰 | 說明 |

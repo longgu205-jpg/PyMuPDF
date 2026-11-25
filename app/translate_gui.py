@@ -28,6 +28,7 @@ class TranslatorApp(tk.Tk):
         self.minsize(640, 480)
         self.queue = queue.Queue()
         self.worker = None
+        self.abort_event = None
         self.var_input = tk.StringVar(value="")
         self.var_out = tk.StringVar(value="")
         self._build_widgets()
@@ -78,6 +79,8 @@ class TranslatorApp(tk.Tk):
         row5.pack(fill="x", **pad)
         self.btn_start = ttk.Button(row5, text="2. 開始翻譯", command=self.start)
         self.btn_start.pack(side="left")
+        self.btn_abort = ttk.Button(row5, text="中斷", command=self.abort, state="disabled")
+        self.btn_abort.pack(side="left", padx=(8, 0))
         self.progress = ttk.Progressbar(row5, mode="determinate", length=380)
         self.progress.pack(side="left", padx=12)
         self.lbl_pct = ttk.Label(row5, text="0%")
@@ -138,10 +141,18 @@ class TranslatorApp(tk.Tk):
             return
         engine, dst, files, out, engine_kwargs = job
         self.btn_start.configure(state="disabled")
+        self.btn_abort.configure(state="normal")
         self.progress.configure(value=0)
+        self.abort_event = threading.Event()
         self._log(f"引擎：{engine}｜目標語言：{dst}｜共 {len(files)} 個檔案")
         self.worker = threading.Thread(target=self._run, args=job, daemon=True)
         self.worker.start()
+
+    def abort(self):
+        if self.abort_event:
+            self.abort_event.set()
+            self._log("正在中斷，等目前請求結束…")
+        self.btn_abort.configure(state="disabled")
 
     def _run(self, engine, dst, files, out, engine_kwargs):
         try:
@@ -164,7 +175,15 @@ class TranslatorApp(tk.Tk):
                 )
                 self.queue.put(("file", f"[{i}/{len(files)}] {os.path.basename(src_pdf)}", None))
                 results.append(
-                    translate_pdf(src_pdf, target, translator=translator, src="en", dst=dst, progress_cb=cb)
+                    translate_pdf(
+                        src_pdf,
+                        target,
+                        translator=translator,
+                        src="en",
+                        dst=dst,
+                        progress_cb=cb,
+                        abort=self.abort_event,
+                    )
                 )
             self.queue.put(("done", results, None))
         except Exception as e:
@@ -187,13 +206,19 @@ class TranslatorApp(tk.Tk):
                     for out_path, info in results:
                         self._log(f"完成：{out_path}（{info.page_count} 頁，失敗 {info.failed_blocks} 區塊）")
                     self.btn_start.configure(state="normal")
+                    self.btn_abort.configure(state="disabled")
                     first_out = results[0][0] if results else None
                     if first_out and messagebox.askyesno("完成", "翻譯完成！要開啟輸出資料夾嗎？"):
                         self._open_folder(os.path.dirname(first_out) or ".")
                 elif kind == "error":
-                    self._log("錯誤：" + b)
-                    messagebox.showerror("翻譯失敗", b)
+                    if b.startswith("TranslationCancelled"):
+                        self._log("已中斷：使用者要求停止，本次未產生輸出檔。")
+                        messagebox.showinfo("已中斷", "翻譯已中斷，未產生輸出檔。")
+                    else:
+                        self._log("錯誤：" + b)
+                        messagebox.showerror("翻譯失敗", b)
                     self.btn_start.configure(state="normal")
+                    self.btn_abort.configure(state="disabled")
         except queue.Empty:
             pass
         self.after(100, self._poll_queue)

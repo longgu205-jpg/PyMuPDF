@@ -156,6 +156,51 @@ def index_pdf_files_helper(path):
     return index_pdf_files(path)
 
 
+class TestBatchTranslate(unittest.TestCase):
+    def test_translate_many_order(self):
+        from pdftrans.translators import MockTranslator
+
+        texts = ["one", "two", "three"]
+        results = MockTranslator().translate_many(texts)
+        self.assertEqual(results, ["【中譯】one", "【中譯】two", "【中譯】three"])
+
+    def test_translate_many_empty(self):
+        from pdftrans.translators import MockTranslator
+
+        self.assertEqual(MockTranslator().translate_many([]), [])
+
+    def test_translate_many_abort(self):
+        import threading
+
+        from pdftrans.translators import MockTranslator, TranslationCancelled
+
+        t = MockTranslator()
+        t.CONCURRENCY = 1
+        event = threading.Event()
+        event.set()
+        with self.assertRaises(TranslationCancelled):
+            t.translate_many(["a", "b"], abort=event)
+
+    def test_pipeline_batch_and_abort(self):
+        import threading
+
+        from pdftrans.translators import MockTranslator, TranslationCancelled
+
+        with tempfile.TemporaryDirectory() as tmp:
+            src = make_sample_pdf(os.path.join(tmp, "in.pdf"))
+            out = os.path.join(tmp, "out.pdf")
+            out_path, info = translate_pdf(src, out, translator=MockTranslator())
+            self.assertTrue(os.path.exists(out_path))
+            self.assertEqual(info.failed_blocks, 0)
+
+            doc = pymupdf.open(src)
+            evt = threading.Event()
+            evt.set()
+            with self.assertRaises(TranslationCancelled):
+                translate_pdf(src, os.path.join(tmp, "x.pdf"), translator=MockTranslator(), abort=evt)
+            doc.close()
+
+
 @unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS") == "1", "live network tests off")
 class TestLiveEngines(unittest.TestCase):
     def test_mymemory(self):

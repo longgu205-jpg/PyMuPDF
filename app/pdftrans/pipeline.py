@@ -3,6 +3,7 @@ import os
 import pymupdf
 
 from .layout import extract_blocks, font_for_lang, int_to_rgb, needs_translation
+from .translators import TranslationCancelled
 
 
 class ProgressInfo:
@@ -28,6 +29,7 @@ def translate_pdf(
     dst="zh-TW",
     progress_cb=None,
     dump_text=None,
+    abort=None,
 ):
     pdf_path = str(pdf_path)
     if out_path is None:
@@ -36,69 +38,79 @@ def translate_pdf(
     out_path = str(out_path)
 
     doc = pymupdf.open(pdf_path)
-    cache = {}
     pending = []
-    total = 0
+    unique = {}
+    info = ProgressInfo(0, doc.page_count)
 
     for pno in range(doc.page_count):
-        page = doc[pno]
-        blocks = extract_blocks(page)
-        page_tasks = []
-        for b in blocks:
-            if not needs_translation(b["text"]):
-                continue
-            total += 1
-            page_tasks.append(b)
-            page.add_redact_annot(b["bbox"], fill=(1, 1, 1))
-        pending.append((pno, page_tasks))
+        tasks = [
+            b
+            for b in extract_blocks(doc[pno])
+            if needs_translation(b["text"])
+        ]
+        pending.append((pno, tasks))
+        for b in tasks:
+            unique[b["text"]] = None
+    info.total_blocks = len(unique)
 
-    info = ProgressInfo(total, doc.page_count)
     if progress_cb:
         progress_cb(info, "start")
 
     if dump_text:
-        _dump_text(pending, dump_text)
+        _dump_stages_text(pending, dump_text)
 
-    for pno, tasks in pending:
-        info.current_page = pno + 1
-        if progress_cb:
-            progress_cb(info, f"translating page {pno + 1}/{doc.page_count}")
-        for b in tasks:
-            original = b["text"]
-            if original in cache:
-                b["zh"] = cache[original]
-                info.done_blocks += 1
-                continue
-            try:
-                b["zh"] = translator.translate(original, src=src, dst=dst)
-            except Exception as e:
-                b["zh"] = None
-                info.failed_blocks += 1
-                print(f"[warn] page {pno + 1} block translation failed ({e}); keeping source text")
-            cache[original] = b["zh"]
-            info.done_blocks += 1
+    texts = list(unique)
+    if texts:
+
+        def batch_progress(done, _total):
+            info.done_blocks = done
             if progress_cb:
-                progress_cb(info, f"translating page {pno + 1}/{doc.page_count}")
+                progress_cb(info, None)
 
-    for pno, tasks in pending:
-        page = doc[pno]
-        page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE)
-        for b in tasks:
-            if not b.get("zh"):
-                continue
-            try:
-                _insert_translation(page, b, dst)
-            except Exception as e:
-                info.failed_blocks += 1
-                print(f"[warn] page {pno + 1} block insert skipped ({e})")
-        if progress_cb:
-            progress_cb(info, f"writing page {pno + 1}/{doc.page_count}")
+        translations = translator.translate_many(
+            texts, src=src, dst=dst, progress=batch_progress, abort=abort
+        )
+        for t, r in zip(texts, translations):
+            unique[t] = r
+    info.done_blocks = info.total_blocks
+    info.failed_blocks = sum(1 for v in unique.values() if v is None)
+
+    results = []
+    try:
+        for pno, tasks in pending:
+            page = doc[pno]
+            for b in tasks:
+                if unique.get(b["text"]):
+                    b["zh"] = unique[b["text"]]
+                    page.add_redact_annot(b["bbox"], fill=(1, 1, 1))
+            page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE)
+            for b in tasks:
+                if not unique.get(b["text"]):
+                    continue
+                try:
+                    _insert_translation(page, b, dst)
+                except Exception as e:
+                    info.failed_blocks += 1
+                    print(f"[warn] page {pno + 1} block insert skipped ({e})")
+            if progress_cb:
+                progress_cb(info, f"writing page {pno + 1}/{doc.page_count}")
+    except (KeyboardInterrupt, TranslationCancelled):
+        doc.close()
+        raise
 
     doc.save(out_path, garbage=3, deflate=True)
     doc.close()
     if progress_cb:
         progress_cb(info, "done")
     return out_path, info
+
+
+def _dump_stages_text(pending, dump_path):
+    with open(dump_path, "w", encoding="utf-8") as f:
+        for pno, tasks in pending:
+            f.write(f"===== page {pno + 1} =====\n")
+            for b in tasks:
+                f.write(f"[{b['bbox']}] {b['text']}\n")
 
 
 def _insert_translation(page, block, dst):
@@ -129,17 +141,8 @@ def _insert_translation(page, block, dst):
     return False
 
 
-def _dump_text(pending, dump_path):
-    with open(dump_path, "w", encoding="utf-8") as f:
-        for pno, tasks in pending:
-            f.write(f"===== page {pno + 1} =====\n")
-            for b in tasks:
-                f.write(f"[{b['bbox']}] {b['text']}\n")
-
-
 def translate_path(input_path, out_path=None, **kwargs):
     input_path = str(input_path)
-
     if os.path.isdir(input_path):
         out_dir = out_path or input_path.rstrip("/\\") + "_translated"
         os.makedirs(out_dir, exist_ok=True)
@@ -147,8 +150,8 @@ def translate_path(input_path, out_path=None, **kwargs):
         for name in sorted(os.listdir(input_path)):
             if not name.lower().endswith(".pdf"):
                 continue
-            src = os.path.join(input_path, name)
-            dst = os.path.join(out_dir, os.path.splitext(name)[0] + "_translated.pdf")
-            results.append(translate_pdf(src, dst, **kwargs))
+            src_file = os.path.join(input_path, name)
+            dst_file = os.path.join(out_dir, os.path.splitext(name)[0] + "_translated.pdf")
+            results.append(translate_pdf(src_file, dst_file, **kwargs))
         return results
     return [translate_pdf(input_path, out_path, **kwargs)]

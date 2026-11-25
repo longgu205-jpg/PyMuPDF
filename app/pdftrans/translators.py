@@ -4,17 +4,55 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 
 class TranslationError(RuntimeError):
     pass
 
 
+class TranslationCancelled(RuntimeError):
+    pass
+
+
 class BaseTranslator:
     name = "base"
+    CONCURRENCY = 8
 
     def translate(self, text, src="en", dst="zh-TW"):
         raise NotImplementedError
+
+    def translate_many(self, texts, src="en", dst="zh-TW", progress=None, abort=None):
+        texts = list(texts)
+        results = [None] * len(texts)
+        if not texts:
+            return results
+        done = 0
+
+        def work(item):
+            idx, text = item
+            if abort is not None and abort.is_set():
+                raise TranslationCancelled()
+            try:
+                return idx, self.translate(text, src, dst)
+            except TranslationCancelled:
+                raise
+            except Exception:
+                return idx, None
+
+        pool = ThreadPoolExecutor(max_workers=self.CONCURRENCY)
+        try:
+            for idx, translated in pool.map(work, enumerate(texts)):
+                results[idx] = translated
+                done += 1
+                if progress:
+                    progress(done, len(texts))
+        except TranslationCancelled:
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+        finally:
+            pool.shutdown(wait=True)
+        return results
 
     def close(self):
         pass
@@ -58,6 +96,7 @@ def _retry(fn, attempts=4, delays=(2, 5, 10)):
 class MyMemoryTranslator(BaseTranslator):
     name = "mymemory"
     MAX_Q = 480
+    CONCURRENCY = 6
 
     def translate(self, text, src="en", dst="zh-TW"):
         text = text.strip()
@@ -79,6 +118,7 @@ class MyMemoryTranslator(BaseTranslator):
 
 class GoogleTranslator(BaseTranslator):
     name = "google"
+    CONCURRENCY = 6
 
     def translate(self, text, src="en", dst="zh-TW"):
         text = text.strip()
@@ -93,6 +133,33 @@ class GoogleTranslator(BaseTranslator):
 
 class DeepLTranslator(BaseTranslator):
     name = "deepl"
+    BATCH_SIZE = 50
+    CONCURRENCY = 4
+
+    def translate_many(self, texts, src="en", dst="zh-TW", progress=None, abort=None):
+        texts = list(texts)
+        results = [None] * len(texts)
+        done = 0
+        for start in range(0, len(texts), self.BATCH_SIZE):
+            if abort is not None and abort.is_set():
+                raise TranslationCancelled()
+            chunk = texts[start : start + self.BATCH_SIZE]
+            payload = {"text": chunk, "target_lang": _deepl_lang(dst)}
+            if src:
+                payload["source_lang"] = src.upper()
+            data = _retry(
+                lambda p=payload: _http_json(
+                    f"https://{self.host}/v2/translate",
+                    data=p,
+                    headers={"Authorization": f"DeepL-Auth-Key {self.api_key}"},
+                )
+            )
+            for j, tr in enumerate(data.get("translations", [])):
+                results[start + j] = tr.get("text")
+            done += len(chunk)
+            if progress:
+                progress(done, len(texts))
+        return results
 
     def __init__(self, api_key=None, host=None):
         self.api_key = api_key or os.environ.get("DEEPL_API_KEY", "")
@@ -121,6 +188,7 @@ class DeepLTranslator(BaseTranslator):
 
 class OpenAITranslator(BaseTranslator):
     name = "openai"
+    CONCURRENCY = 4
 
     def __init__(self, api_key=None, base_url=None, model=None, prompt=None):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
