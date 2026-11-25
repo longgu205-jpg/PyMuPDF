@@ -256,7 +256,14 @@ def create_translator(engine="mymemory", **kwargs):
 
 
 def _deepl_lang(dst):
-    return {"zh-TW": "ZH", "zh-Hant": "ZH", "zh-HK": "ZH", "zh": "ZH", "zh-Hans": "ZH", "en": "EN-US"}.get(dst, dst.upper())
+    return {
+        "zh-TW": "ZH-HANT",
+        "zh-Hant": "ZH-HANT",
+        "zh-HK": "ZH-HANT",
+        "zh": "ZH",
+        "zh-Hans": "ZH-HANS",
+        "en": "EN-US",
+    }.get(dst, dst.upper())
 
 
 def _lang_name(dst):

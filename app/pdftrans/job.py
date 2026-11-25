@@ -1,4 +1,7 @@
+import json
 import os
+
+SETTINGS_FILENAME = "pdf_translator_config.json"
 
 ENGINE_LABELS = {
     "mymemory": "MyMemory（免金鑰，預設）",
@@ -38,6 +41,27 @@ def validate_input(input_obj):
     if not files:
         raise ValueError("沒有找到任何 PDF。")
     return files, batch_out
+
+
+def config_path():
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(base, SETTINGS_FILENAME)
+
+
+def load_settings(path=None):
+    path = path or config_path()
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_settings(settings, path=None):
+    path = path or config_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
 
 
 def parse_key(engine, raw):

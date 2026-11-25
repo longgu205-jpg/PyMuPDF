@@ -41,8 +41,9 @@ python translate_gui.py
 
 1. 選一個 PDF 檔案，**或**選一個資料夾（會批次處理裡面所有 PDF）
 2. 選翻譯引擎（預設 MyMemory 免金鑰）；DeepL / LLM 需在 API Key 欄輸入金鑰
-3. 按視窗按鈕「開始翻譯」，進度條會即時顯示，完成後可一鍵開啟輸出資料夾
-
+3. API Key 欄旁有「記住 API Key」勾選：勾著時按「開始翻譯」會把引擎/語言/key 存到本機設定檔
+   （`%APPDATA%\pdf_translator_config.json`，Windows 上為明碼 JSON，僅建議在自己電腦使用），下次開啟自動填回；取消勾選則存檔時不含 key
+4. 按視窗按鈕「開始翻譯」，進度條會即時顯示，完成後可一鍵開啟輸出資料夾
 批次模式的輸出預設在 `<輸入資料夾>_translated/`，單檔模式預設與輸入檔同資料夾（`原名_translated.pdf`）。
 
 ## 命令列用法
@@ -86,7 +87,7 @@ python translate_cli.py 樣本.pdf --dump-text blocks.txt --engine mock
 |------|------|------|
 | `mymemory` | 不需要 | 免費，沙箱實測可用；每天有約 5,000 字限制 |
 | `google` | 不需要 | 免費非官方端點，部分網路環境會被限流（HTTP 429） |
-| `deepl` | 需要 | 品質佳，免費層每月 50 萬字，`api-free.deepl.com` |
+| `deepl` | 需要 | 品質佳，免費層每月 50 萬字，`api-free.deepl.com`；繁中送 `ZH-HANT`、簡中送 `ZH-HANS` |
 | `openai` | 需要 | LLM 翻譯最通順，可串任何 OpenAI 相容服務 |
 | `mock` | 不需要 | 測試用，離線產生「【中譯】+原文」 |
 

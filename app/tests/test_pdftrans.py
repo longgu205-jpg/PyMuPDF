@@ -144,6 +144,31 @@ class TestGuiHelpers(unittest.TestCase):
         self.assertEqual(o.model, "m")
         self.assertEqual(o.base_url, "https://x/v1")
 
+    def test_deepl_lang_map(self):
+        from pdftrans.translators import _deepl_lang
+
+        self.assertEqual(_deepl_lang("zh-TW"), "ZH-HANT")
+        self.assertEqual(_deepl_lang("zh-Hant"), "ZH-HANT")
+        self.assertEqual(_deepl_lang("zh-HK"), "ZH-HANT")
+        self.assertEqual(_deepl_lang("zh-Hans"), "ZH-HANS")
+        self.assertEqual(_deepl_lang("zh"), "ZH")
+        self.assertEqual(_deepl_lang("en"), "EN-US")
+        self.assertEqual(_deepl_lang("ja"), "JA")
+
+    def test_settings_roundtrip(self):
+        from pdftrans import job
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.json")
+            self.assertEqual(job.load_settings(path), {})
+            job.save_settings({"engine": "deepl", "api_key": "abc:fx", "remember": True}, path)
+            data = job.load_settings(path)
+            self.assertEqual(data["engine"], "deepl")
+            self.assertEqual(data["api_key"], "abc:fx")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("not json")
+            self.assertEqual(job.load_settings(path), {})
+
     def test_gui_engine_wiring(self):
         from pdftrans.job import parse_key
         from pdftrans.translators import DeepLTranslator, OpenAITranslator, create_translator

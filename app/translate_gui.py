@@ -11,7 +11,9 @@ from pdftrans.job import (
     ENGINE_LABELS,
     engine_to_label,
     label_to_engine,
+    load_settings,
     parse_key,
+    save_settings,
     validate_input,
 )
 from pdftrans.glossary import load_glossary
@@ -33,7 +35,9 @@ class TranslatorApp(tk.Tk):
         self.var_input = tk.StringVar(value="")
         self.var_out = tk.StringVar(value="")
         self.var_glossary = tk.StringVar(value="")
+        self.var_remember = tk.BooleanVar(value=True)
         self._build_widgets()
+        self._load_settings()
         self.after(100, self._poll_queue)
 
     def _build_widgets(self):
@@ -71,6 +75,9 @@ class TranslatorApp(tk.Tk):
         ttk.Entry(row3, textvariable=self.var_key, width=48, show="*").pack(side="left")
         self.lbl_key_hint = ttk.Label(row3, text="", foreground="#777")
         self.lbl_key_hint.pack(side="left", padx=6)
+        ttk.Checkbutton(
+            row3, text="記住 API Key（存在本機設定檔）", variable=self.var_remember
+        ).pack(side="left", padx=(6, 0))
 
         row4 = ttk.Frame(frame)
         row4.pack(fill="x", **pad)
@@ -106,6 +113,29 @@ class TranslatorApp(tk.Tk):
             "openai": "格式：API_KEY 或 BASE_URL|API_KEY|MODEL",
         }
         self.lbl_key_hint.configure(text=hints.get(engine, "此引擎不需要 key"))
+
+    def _load_settings(self):
+        settings = load_settings()
+        engine = settings.get("engine")
+        if engine in ENGINES:
+            self.cmb_engine.set(engine_to_label(engine))
+        if settings.get("dst") == "zh-Hans":
+            self.cmb_lang.current(1)
+        self.var_key.set(settings.get("api_key", ""))
+        self.var_remember.set(settings.get("remember", True))
+        self._toggle_key_hint()
+
+    def _save_settings(self):
+        engine = label_to_engine(self.cmb_engine.get())
+        dst = "zh-TW" if self.cmb_lang.get().startswith("zh-TW") else "zh-Hans"
+        if self.var_remember.get():
+            data = {"engine": engine, "dst": dst, "api_key": self.var_key.get().strip(), "remember": True}
+        else:
+            data = {"engine": engine, "dst": dst, "remember": False}
+        try:
+            save_settings(data)
+        except OSError as e:
+            self._log(f"無法儲存設定檔：{e}")
 
     def choose_pdf(self):
         path = filedialog.askopenfilename(title="選擇 PDF", filetypes=[("PDF 檔案", "*.pdf")])
@@ -161,6 +191,7 @@ class TranslatorApp(tk.Tk):
         self.btn_abort.configure(state="normal")
         self.progress.configure(value=0)
         self.abort_event = threading.Event()
+        self._save_settings()
         self._log(f"引擎：{engine}｜目標語言：{dst}｜共 {len(files)} 個檔案")
         self.worker = threading.Thread(target=self._run, args=job, daemon=True)
         self.worker.start()
