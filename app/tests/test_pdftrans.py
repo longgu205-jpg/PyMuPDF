@@ -142,6 +142,18 @@ class TestGuiHelpers(unittest.TestCase):
         self.assertEqual(o.model, "m")
         self.assertEqual(o.base_url, "https://x/v1")
 
+    def test_gui_engine_wiring(self):
+        from pdftrans.job import parse_key
+        from pdftrans.translators import DeepLTranslator, OpenAITranslator, create_translator
+
+        d = create_translator("deepl", **parse_key("deepl", "abc:fx"))
+        self.assertIsInstance(d, DeepLTranslator)
+        self.assertEqual(d.host, "api-free.deepl.com")
+        o = create_translator("openai", **parse_key("openai", "https://x/v1|K|m"))
+        self.assertIsInstance(o, OpenAITranslator)
+        self.assertEqual(o.model, "m")
+        self.assertEqual(o.base_url, "https://x/v1")
+
     def test_validate_input(self):
         from pdftrans.job import validate_input
 
