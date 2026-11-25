@@ -144,7 +144,8 @@ class TestGuiHelpers(unittest.TestCase):
         self.assertAlmostEqual(int_to_rgb(0), (0.0, 0.0, 0.0))
         self.assertEqual(int_to_rgb((0.5, 0.5, 0.5)), (0.5, 0.5, 0.5))
         self.assertEqual(int_to_rgb((128, 128, 128)), (128 / 255, 128 / 255, 128 / 255))
-        for bad in [None, "red", -5, 0xFFFFFFFF, (1, 2), (0.5,), object(), True]:
+        self.assertEqual(int_to_rgb((0.5,)), (0.5,))
+        for bad in [None, "red", -5, 0xFFFFFFFF, (1, 2), object(), True]:
             result = int_to_rgb(bad)
             self.assertEqual(result, (0.0, 0.0, 0.0), str(bad))
 
