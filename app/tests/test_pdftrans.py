@@ -402,6 +402,82 @@ class TestFailureResilience(unittest.TestCase):
             self.assertIn("【中譯】Quarterly", text)
 
 
+class TestParagraphReflow(unittest.TestCase):
+    def make_lines_pdf(self, path, lines):
+        doc = pymupdf.open()
+        page = doc.new_page(width=595, height=842)
+        y = 100.0
+        for y_step, text in lines:
+            page.insert_text((72, y), text, fontsize=11)
+            y += y_step
+        doc.save(path)
+        doc.close()
+        return path
+
+    def open_blocks(self, pdf):
+        doc = pymupdf.open(pdf)
+        try:
+            return extract_blocks(doc[0])
+        finally:
+            doc.close()
+
+    def test_same_paragraph_lines_merged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = self.make_lines_pdf(
+                os.path.join(tmp, "p.pdf"),
+                [
+                    (15, "The quick brown fox jumps over"),
+                    (15, "the lazy dog near the river bank"),
+                    (15, "every single sunny morning."),
+                ],
+            )
+            blocks = [b for b in self.open_blocks(pdf) if b["cell"] is None]
+            self.assertEqual(len(blocks), 1, [b["text"] for b in blocks])
+            self.assertIn("every single sunny morning", blocks[0]["text"])
+            self.assertGreater(blocks[0]["bbox"].width, 100)
+
+    def test_paragraphs_split_on_big_gap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = self.make_lines_pdf(
+                os.path.join(tmp, "p.pdf"),
+                [
+                    (15, "First paragraph text line one."),
+                    (15, "First paragraph text line two."),
+                    (55, "Second paragraph starts right here."),
+                    (15, "Second paragraph continues more."),
+                ],
+            )
+            blocks = [b for b in self.open_blocks(pdf) if b["cell"] is None]
+            texts = [b["text"] for b in blocks]
+            self.assertEqual(len(blocks), 2, texts)
+            self.assertTrue(texts[0].startswith("First paragraph"), texts)
+            self.assertTrue(texts[1].startswith("Second paragraph"), texts)
+
+    def test_reflow_end_to_end(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = self.make_lines_pdf(
+                os.path.join(tmp, "p.pdf"),
+                [
+                    (15, "The quick brown fox jumps over"),
+                    (15, "the lazy dog near the river bank"),
+                    (15, "every single sunny morning."),
+                ],
+            )
+            out = os.path.join(tmp, "o.pdf")
+            _, info = translate_pdf(pdf, out, translator=MockTranslator())
+            self.assertEqual(info.failed_blocks, 0)
+            doc = pymupdf.open(out)
+            try:
+                text = doc[0].get_text()
+            finally:
+                doc.close()
+            flat = re.sub(r"\s+", " ", text)
+            self.assertIn(
+                "\u3010\u4e2d\u8b6f\u3011The quick brown fox jumps over the lazy dog near the river bank every single sunny morning.",
+                flat,
+            )
+
+
 @unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS") == "1", "live network tests off")
 class TestLiveEngines(unittest.TestCase):
     def test_mymemory(self):

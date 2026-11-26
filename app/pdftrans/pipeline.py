@@ -129,7 +129,7 @@ def _insert_translation(page, block, dst):
         avail = pymupdf.Rect(
             max(rect.x0 - margin, 0),
             max(rect.y0 - margin, 0),
-            min(rect.x1 + rect.width * 0.25, page.rect.x1 - margin),
+            min(rect.x1 + rect.width * 0.10, page.rect.x1 - margin),
             min(rect.y1 + rect.height * 0.75, page.rect.y1 - margin),
         )
     color = int_to_rgb(block.get("color", 0))
