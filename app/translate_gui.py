@@ -110,6 +110,7 @@ class TranslatorApp(tk.Tk):
         engine = label_to_engine(self.cmb_engine.get())
         hints = {
             "deepl": "DeepL key 到 deepl.com 免費申請",
+            "groq": "key 到 console.groq.com 免費申請（不用填模型）",
             "openai": "格式：API_KEY 或 BASE_URL|API_KEY|MODEL",
         }
         self.lbl_key_hint.configure(text=hints.get(engine, "此引擎不需要 key"))

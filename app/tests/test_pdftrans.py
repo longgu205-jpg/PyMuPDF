@@ -169,6 +169,21 @@ class TestGuiHelpers(unittest.TestCase):
                 f.write("not json")
             self.assertEqual(job.load_settings(path), {})
 
+    def test_groq_engine(self):
+        from pdftrans.job import parse_key
+        from pdftrans.translators import GroqTranslator, create_translator
+
+        g = create_translator("groq", **parse_key("groq", "gsk_test"))
+        self.assertIsInstance(g, GroqTranslator)
+        self.assertEqual(g.base_url, "https://api.groq.com/openai/v1")
+        self.assertEqual(g.model, "llama-3.3-70b-versatile")
+        self.assertEqual(g.api_key, "gsk_test")
+        self.assertEqual(parse_key("groq", "K"), {"groq_key": "K"})
+        with self.assertRaises(ValueError):
+            parse_key("groq", "")
+        with self.assertRaises(Exception):
+            create_translator("groq", groq_key="")
+
     def test_gui_engine_wiring(self):
         from pdftrans.job import parse_key
         from pdftrans.translators import DeepLTranslator, OpenAITranslator, create_translator

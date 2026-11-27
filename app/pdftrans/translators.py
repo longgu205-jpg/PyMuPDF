@@ -229,10 +229,30 @@ class OpenAITranslator(BaseTranslator):
         return data["choices"][0]["message"]["content"].strip()
 
 
+class GroqTranslator(OpenAITranslator):
+    name = "groq"
+    CONCURRENCY = 8
+
+    def __init__(self, api_key=None, base_url=None, model=None, prompt=None):
+        if not api_key:
+            api_key = os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            raise TranslationError(
+                "Groq 引擎需要 API key：到 console.groq.com 免費申請，傳入 --groq-key 或設定環境變數 GROQ_API_KEY。"
+            )
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url or os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+            model=model or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            prompt=prompt,
+        )
+
+
 ENGINES = {
     "mymemory": MyMemoryTranslator,
     "google": GoogleTranslator,
     "deepl": DeepLTranslator,
+    "groq": GroqTranslator,
     "openai": OpenAITranslator,
     "mock": MockTranslator,
 }
@@ -240,6 +260,7 @@ ENGINES = {
 
 ENGINE_KWARG_ALIASES = {
     "deepl": {"deepl_key": "api_key"},
+    "groq": {"groq_key": "api_key"},
     "openai": {"openai_key": "api_key", "openai_base": "base_url", "openai_model": "model"},
 }
 

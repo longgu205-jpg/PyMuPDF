@@ -15,10 +15,11 @@ def build_arg_parser():
     )
     p.add_argument("input", help="輸入 PDF 檔案或整個資料夾（資料夾會批次處理所有 PDF）")
     p.add_argument("-o", "--output", help="輸出 PDF（或資料夾輸出目錄）；預設：<原名>_translated.pdf")
-    p.add_argument("--engine", default="mymemory", choices=["mymemory", "google", "deepl", "openai", "mock"], help="翻譯引擎")
+    p.add_argument("--engine", default="mymemory", choices=["mymemory", "google", "deepl", "groq", "openai", "mock"], help="翻譯引擎")
     p.add_argument("--src", default="en", help="來源語言")
     p.add_argument("--dst", default="zh-TW", help="目標語言（zh-TW 繁中 / zh-Hans 簡中）")
     p.add_argument("--deepl-key", default=None, help="DeepL API key（或環境變數 DEEPL_API_KEY）")
+    p.add_argument("--groq-key", default=None, help="Groq API key（或環境變數 GROQ_API_KEY）")
     p.add_argument("--openai-key", default=None, help="OpenAI 相容 API key（或環境變數 OPENAI_API_KEY）")
     p.add_argument("--openai-base", default=None, help="OpenAI 相容 API base URL（或 OPENAI_BASE_URL）")
     p.add_argument("--openai-model", default=None, help="模型名稱（或 OPENAI_MODEL）")
@@ -71,6 +72,8 @@ def main(argv=None):
 def _engine_kwargs(args):
     if args.engine == "deepl":
         return {"api_key": args.deepl_key}
+    if args.engine == "groq":
+        return {"api_key": args.groq_key}
     if args.engine == "openai":
         return {
             "api_key": args.openai_key,

@@ -7,6 +7,7 @@ ENGINE_LABELS = {
     "mymemory": "MyMemory（免金鑰，預設）",
     "google": "Google 免費端點（免金鑰）",
     "deepl": "DeepL（需 API key，品質佳）",
+    "groq": "Groq LLM（免費申請，快，品質佳）",
     "openai": "LLM OpenAI 相容（需 API key）",
     "mock": "Mock 離線測試（不連網）",
 }
@@ -69,6 +70,10 @@ def parse_key(engine, raw):
         if not raw:
             raise ValueError("DeepL 需要 API key（到 deepl.com 免費申請）。")
         return {"deepl_key": raw}
+    if engine == "groq":
+        if not raw:
+            raise ValueError("Groq 需要 API key（到 console.groq.com 免費申請）。")
+        return {"groq_key": raw}
     if engine == "openai":
         if not raw:
             raise ValueError("LLM 引擎需要 API key。")

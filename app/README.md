@@ -66,6 +66,9 @@ python translate_cli.py 樣本.pdf --dst zh-Hans
 # 串 DeepL（有免費額度，品質較好）
 python translate_cli.py 樣本.pdf --engine deepl --deepl-key 你的KEY
 
+# 串 Groq LLM（免費申請，快，LLM 品質；到 console.groq.com 拿 key）
+python translate_cli.py 樣本.pdf --engine groq --groq-key 你的KEY
+
 # 串 OpenAI 相容 API（可接任何相容服務）
 python translate_cli.py 樣本.pdf --engine openai --openai-key 你的KEY \
     --openai-base https://api.openai.com/v1 --openai-model gpt-4o-mini
@@ -106,7 +109,7 @@ python translate_cli.py 樣本.pdf --dump-text blocks.txt --engine mock
 | `mymemory` | 不需要 | 免費，沙箱實測可用；每天有約 5,000 字限制 |
 | `google` | 不需要 | 免費非官方端點，部分網路環境會被限流（HTTP 429） |
 | `deepl` | 需要 | 品質佳，免費層每月 50 萬字，`api-free.deepl.com`；繁中送 `ZH-HANT`、簡中送 `ZH-HANS` |
-| `openai` | 需要 | LLM 翻譯最通順，可串任何 OpenAI 相容服務 |
+| `groq` | 需要 | LLM 翻譯品質佳，Groq 速度極快，免費申請（console.groq.com） |
 | `mock` | 不需要 | 測試用，離線產生「【中譯】+原文」 |
 
 ## 測試
